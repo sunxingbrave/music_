@@ -21,9 +21,10 @@
             </div>
             <scroll
             class="middle-r"
+            ref="lyricScrollRef"
           >
             <div class="lyric-wrapper">
-              <div v-if="currentLyric">
+              <div v-if="currentLyric" ref="lyricListRef">
                 <p
                   class="text"
                   :class="{'current': currentLineNum ===index}"
@@ -96,9 +97,6 @@ export default {
       const store = useStore()
       const fullScreen = computed(() => store.state.fullScreen)
       const currentSong = computed(() => store.getters.currentSong)
-      console.log(88)
-      console.log('//////////////////')
-      console.log(currentSong)
       const playing = computed(() => store.state.playing)
       const currentIndex = computed(() => store.state.currentIndex)
       const playMode = computed(() => store.state.playMode)
@@ -107,7 +105,7 @@ export default {
       const { modeIcon, changeMode } = useMode() // 是否时随机播放
       const { getFavoritaIcon, toggleFavorite } = useFavorite()
       const { cdCls, cdRef, cdImageRef } = useCd()
-      const { currentLyric, currentLineNum } = useLyric()
+      const { currentLyric, currentLineNum, lyricScrollRef, lyricListRef, playLyric, stopLyric } = useLyric({ songReady, currentTime })
 
       // computed
       const playlist = computed(() => store.state.playlist)
@@ -142,8 +140,14 @@ export default {
           return
         }
         currentTime.value = 0 // 切歌的时候要把它置为0
-          const audioEl = audioRef.value
-          newPlaying ? audioEl.play() : audioEl.pause()
+        const audioEl = audioRef.value
+        if (newPlaying) {
+          audioEl.play()
+          playLyric()
+        } else {
+          audioEl.pause()
+          stopLyric()
+        }
       })
       // methods
       function goBack() {
@@ -211,6 +215,7 @@ export default {
           return
         }
         songReady.value = true
+        playLyric()
       }
 
       function error() {
@@ -226,6 +231,8 @@ export default {
       function onProgressChanging(progress) {
         progresChanging = true
         currentTime.value = currentSong.value.duration * progress
+        playLyric() // 先同步到当前位置
+        stopLyric()
       }
       function onProgressChanged(progress) {
         progresChanging = false
@@ -234,6 +241,7 @@ export default {
         if (!playing.value) { // 如果是暂停的 就播放
           store.commit('setPlayingState', true)
         }
+        playLyric()
       }
 
       function end() {
@@ -277,7 +285,10 @@ export default {
           cdRef,
           // lyric
           currentLyric,
-          currentLineNum
+          currentLineNum,
+          playLyric,
+          lyricScrollRef,
+          lyricListRef
       }
   }
 }
@@ -302,6 +313,7 @@ export default {
         z-index: -1;
         opacity: 0.6;
         filter: blur(20px);
+
         img {
           width: 100%;
           height: 100%;
@@ -315,13 +327,13 @@ export default {
           top: 0;
           left: 6px;
           z-index: 50;
-          .icon-back {
+        }
+        .icon-back {
           display: block;
           padding: 9px;
           font-size: $font-size-large-x;
           color: $color-theme;
           transform: rotate(-90deg);
-          }
         }
         .title {
           width: 70%;
@@ -347,7 +359,7 @@ export default {
         white-space: nowrap;
         font-size: 0;
         .middle-l {
-          display: inline-block;
+          display: none;
           vertical-align: top;
           position: relative;
           width: 100%;
@@ -398,12 +410,6 @@ export default {
               &.current {
                 color: $color-text;
               }
-            }
-            .pure-music {
-              padding-top: 50%;
-              line-height: 32px;
-              color: $color-text-l;
-              font-size: $font-size-medium;
             }
           }
         }
@@ -482,6 +488,21 @@ export default {
           .icon-favorite {
             color: $color-sub-theme;
           }
+        }
+      }
+      &.normal-enter-active, &.normal-leave-active {
+        transition: all .6s;
+        .top, .bottom {
+          transition: all .6s cubic-bezier(0.45, 0, 0.55, 1);
+        }
+      }
+      &.normal-enter-from, &.normal-leave-to {
+        opacity: 0;
+        .top {
+          transform: translate3d(0, -100px, 0);
+        }
+        .bottom {
+          transform: translate3d(0, 100px, 0)
         }
       }
     }
